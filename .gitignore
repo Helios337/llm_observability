@@ -1,0 +1,11 @@
+*.pyc
+__pycache__/
+*.db
+.env
+venv/
+*.egg-info/
+dist/
+build/
+.DS_Store
+.playwright-mcp/
+*.png
