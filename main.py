@@ -39,8 +39,8 @@ def main():
             print(f"Eval Score: {eval_result['score']:.2f}")
             if 'feedback' in eval_result:
                 print(f"Feedback: {eval_result['feedback']}")
-            
-            db.update_last_eval(eval_result['score'], eval_result.get('feedback', ''))
+
+            db.update_eval(result['id'], eval_result['score'], eval_result.get('feedback', ''))
         else:
             print("Failed to get response")
     

@@ -28,57 +28,61 @@ def favicon():
 def get_metrics():
     metrics = db.get_metrics()
     return jsonify({
-        'total_calls': metrics[0],
-        'avg_latency': round(metrics[1], 3) if metrics[1] else 0,
-        'total_cost': round(metrics[2], 6) if metrics[2] else 0,
-        'avg_eval_score': round(metrics[3], 2) if metrics[3] else 0
+        'total_calls': metrics['total_calls'],
+        'avg_latency': round(metrics['avg_latency'], 3) if metrics['avg_latency'] else 0,
+        'total_cost': round(metrics['total_cost'], 6) if metrics['total_cost'] else 0,
+        'avg_eval_score': round(metrics['avg_eval_score'], 2) if metrics['avg_eval_score'] else 0
     })
 
 @app.route('/api/recent-calls')
 def get_recent_calls():
-    rows = db.get_recent_calls(50)
     calls = []
-    for row in rows:
+    for call in db.get_recent_calls(50):
+        prompt = call['prompt']
+        response = call['response']
         calls.append({
-            'id': row[0],
-            'timestamp': row[1],
-            'model': row[2],
-            'prompt': row[3][:100] + '...' if len(row[3]) > 100 else row[3],
-            'response': row[4][:100] + '...' if len(row[4]) > 100 else row[4],
-            'latency': round(row[5], 3),
-            'cost': round(row[6], 6),
-            'tokens_used': row[7],
-            'eval_score': round(row[8], 2) if row[8] else None
+            'id': call['id'],
+            'timestamp': call['timestamp'],
+            'model': call['model'],
+            'prompt': prompt[:100] + '...' if len(prompt) > 100 else prompt,
+            'response': response[:100] + '...' if len(response) > 100 else response,
+            'latency': round(call['latency'], 3),
+            'cost': round(call['cost'], 6),
+            'tokens_used': call['tokens_used'],
+            'eval_score': round(call['eval_score'], 2) if call['eval_score'] is not None else None
         })
     return jsonify(calls)
 
+
+def _recent_calls_dataframe():
+    rows = db.get_recent_calls(100)
+    columns = ['id', 'timestamp', 'model', 'prompt', 'response', 'latency',
+               'cost', 'tokens_used', 'eval_score', 'eval_feedback']
+    df = pd.DataFrame([{c: r[c] for c in columns} for r in rows], columns=columns)
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    return df
+
+
 @app.route('/api/latency-chart')
 def latency_chart():
-    rows = db.get_recent_calls(100)
-    df = pd.DataFrame(rows, columns=['id', 'timestamp', 'model', 'prompt', 'response', 'latency', 'cost', 'tokens', 'eval_score', 'eval_feedback'])
-    df['timestamp'] = pd.to_datetime(df['timestamp'])
-    
+    df = _recent_calls_dataframe()
     fig = px.line(df, x='timestamp', y='latency', title='Latency Over Time')
-    return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+    return jsonify(json.loads(json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)))
+
 
 @app.route('/api/cost-chart')
 def cost_chart():
-    rows = db.get_recent_calls(100)
-    df = pd.DataFrame(rows, columns=['id', 'timestamp', 'model', 'prompt', 'response', 'latency', 'cost', 'tokens', 'eval_score', 'eval_feedback'])
-    df['timestamp'] = pd.to_datetime(df['timestamp'])
-    
+    df = _recent_calls_dataframe()
     fig = px.bar(df, x='timestamp', y='cost', title='Cost Over Time')
-    return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+    return jsonify(json.loads(json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)))
+
 
 @app.route('/api/eval-chart')
 def eval_chart():
-    rows = db.get_recent_calls(100)
-    df = pd.DataFrame(rows, columns=['id', 'timestamp', 'model', 'prompt', 'response', 'latency', 'cost', 'tokens', 'eval_score', 'eval_feedback'])
+    df = _recent_calls_dataframe()
     df = df[df['eval_score'].notna()]
-    df['timestamp'] = pd.to_datetime(df['timestamp'])
-    
     fig = px.scatter(df, x='timestamp', y='eval_score', title='Evaluation Scores Over Time')
-    return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+    return jsonify(json.loads(json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)))
 
 if __name__ == '__main__':
     print(f"Dashboard running on http://localhost:{PORT}")

@@ -1,4 +1,3 @@
-import json
 import re
 from llm_wrapper import LLMWrapper
 
@@ -55,7 +54,8 @@ Response: {response}
 
 Provide a score from 1-10 and brief feedback. Format: Score: X/10, Feedback: [your feedback]"""
         
-        result = self.judge_llm.call(judge_prompt, temperature=0.3, max_tokens=200)
+        # Internal call: don't log to DB so judge requests don't pollute user-facing metrics.
+        result = self.judge_llm.call(judge_prompt, temperature=0.3, max_tokens=200, log=False)
         
         if result:
             content = result['content']
